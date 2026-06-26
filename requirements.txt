@@ -1,0 +1,8 @@
+# Apache Airflow — version fixée pour reproductibilité
+apache-airflow==2.10.5
+
+# Dépendances du pipeline NovaShop
+pandas>=2.0.0
+
+# Connecteur Postgres (métadonnées Airflow)
+psycopg2-binary>=2.9.0

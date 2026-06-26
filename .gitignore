@@ -1,0 +1,38 @@
+# ===========================
+# Airflow
+# ===========================
+logs/
+output/
+plugins/
+__pycache__/
+*.pyc
+*.pyo
+.airflow/
+
+# Entrepôt SQLite généré
+output/warehouse.db
+output/staging/
+
+# ===========================
+# Environnement local
+# ===========================
+.env
+*.env.local
+venv/
+.venv/
+env/
+
+# ===========================
+# Data brute (volumétrie)
+# ===========================
+data/*.csv
+
+# ===========================
+# OS / IDE
+# ===========================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

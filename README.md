@@ -1,78 +1,169 @@
-> **Démarrage one-click :** `docker compose up -d` puis http://localhost:8080 (airflow / airflow). Détails dans DEMARRAGE.md.
+# Projet NovaShop — ETL Apache Airflow
 
-# Projet NovaShop — Énoncé étudiant (Séances 3 & 4)
+Projet de groupe du module B3 IA & Data / Outils ETL.  
+Le but est de construire un pipeline ETL complet avec Apache Airflow à partir de 6 sources CSV, puis de produire un entrepôt en étoile exploitable et 3 KPI métier.
 
-Module B3 IA & Data · Outils ETL · **Projet de groupe** · 100 % Apache Airflow.
+## Démarrage rapide
 
-NovaShop est un e-commerce alimenté par **6 sources** brutes. Votre mission : construire
-un pipeline ETL complet qui produit un **entrepôt en étoile** exploitable, puis calculer
-3 KPI. Le squelette du code et les deux DAGs vous sont fournis ; vous implémentez la
-logique de transformation, de modélisation et de chargement.
-
-## 1. Ce qui vous est fourni
+1. Lancer les services :
+```bash
+docker compose up -d
 ```
+
+2. Ouvrir Airflow :
+- http://localhost:8080
+- identifiants par défaut : `airflow` / `airflow`
+
+3. Vérifier l’état des DAGs :
+- `novashop_transform`
+- `novashop_warehouse`
+
+## Structure du projet
+
+```text
 novashop_airflow/
 ├── dags/
-│   ├── novashop_lib.py            # STARTER : fonctions à compléter (# TODO)
-│   ├── novashop_transform_dag.py  # DAG A (séance 3) — fourni
-│   └── novashop_warehouse_dag.py  # DAG B (séance 4) — fourni
-├── data/                          # 6 sources brutes (CSV)
-├── sql/kpi_a_completer.sql        # énoncé des 3 KPI
-├── docs/TEMPLATE_documentation.md # documentation à rendre
-└── output/                        # l'entrepôt warehouse.db sera créé ici
+│   ├── novashop_lib.py
+│   ├── novashop_transform_dag.py
+│   └── novashop_warehouse_dag.py
+├── data/
+├── sql/
+│   └── kpi_a_completer.sql
+├── docs/
+│   └── TEMPLATE_documentation.md
+└── output/
+    └── warehouse.db
 ```
 
-## 2. Les 6 sources
-| Source | Système | Clé |
-|---|---|---|
-| customers_raw | CRM | customer_id |
-| customer_changes_raw | CRM (changements de segment) | customer_id + change_date |
-| products_raw | Catalogue | product_id |
-| orders_raw | App e-commerce | order_id |
-| order_items_raw | App e-commerce (lignes) | order_item_id |
-| returns_raw | SAV / retours | return_id |
+## Sources de données
 
-> Les sources contiennent **des anomalies réalistes** (doublons, valeurs manquantes,
-> mauvais types, clés orphelines, dates au format FR, quantités invalides…).
-> À vous de les détecter et de les traiter — **sans supprimer en silence** : routez
-> les lignes invalides vers la table de quarantaine `rejects` (helper `_reject` fourni).
+Le projet repose sur 6 fichiers bruts :
 
-## 3. Travail à réaliser
+- `customers_raw`
+- `customer_changes_raw`
+- `products_raw`
+- `orders_raw`
+- `order_items_raw`
+- `returns_raw`
 
-### Séance 3 — Transformation & nettoyage (DAG A)
-Compléter dans `novashop_lib.py` :
-- `clean_customers`, `clean_customer_changes`, `clean_products`, `clean_orders`,
-  `clean_order_items`, `clean_returns` (nettoyage + quarantaine + enrichissement).
-- `build_dim_customer_scd2` : **dimension client en SCD Type 2** (historiser les
-  segments : `valid_from` / `valid_to` / `is_current`, clé technique `customer_sk`).
-- **Documenter** chaque transformation (template `docs/`).
+Les données contiennent volontairement des anomalies réalistes :
+- doublons,
+- valeurs manquantes,
+- clés orphelines,
+- types incohérents,
+- dates au format français,
+- quantités invalides.
 
-### Séance 4 — Chargement, automatisation, supervision (DAG B)
-Compléter dans `novashop_lib.py` :
-- `build_dimensions` (dim_product, dim_date).
-- `has_new_data` + `build_fact_for_day` : **table de faits** (grain = ligne, commandes
-  `completed`), jointure **SCD2** pour `segment_at_order`, intégration des **retours**
-  (`montant_net_de_retours`).
-- `refresh_aggregate_mart` (`sales_monthly`) et `quality_gate` (contrôles bloquants).
-- Comprendre et expliquer l'**orchestration** (le DAG A publie un Dataset qui déclenche
-  le DAG B), le **chargement incrémental idempotent** par jour, les **retries/SLA/alerting**.
+Les lignes invalides sont envoyées vers la table de quarantaine `rejects`.
 
-## 4. Mise en route
-1. Copier `dags/*.py` dans le dossier `dags/` d'Airflow (gardez `novashop_lib.py` à côté).
-2. Placer `data/` et `output/` sous `/opt/airflow`, ou définir `ETL_BASE_DIR`.
-3. Implémenter les fonctions, activer `novashop_transform` puis observer le déclenchement
-   automatique de `novashop_warehouse`. Backfill :
-   `airflow dags backfill novashop_warehouse -s 2024-07-01 -e 2025-06-30`.
-> Tant qu'une fonction n'est pas implémentée, elle lève `NotImplementedError` (normal).
+## Pipeline Airflow
 
-## 5. Les 3 KPI à calculer (`sql/kpi_a_completer.sql`)
-1. **CA net de retours mensuel** (+ variation % vs mois précédent).
-2. **Taux de retour par catégorie** de produit.
-3. **Panier moyen par segment au moment de la commande** (utiliser la version SCD2 valide
-   à la date de commande, pas le segment courant).
+### DAG A — `novashop_transform`
+Ce DAG gère :
+- l’extraction des fichiers bruts,
+- le nettoyage et la normalisation,
+- la création de la dimension client en SCD Type 2,
+- le chargement des tables de référence.
 
-## 6. Livrables (par groupe)
-- Code complété (`novashop_lib.py`) + pipeline qui s'exécute.
-- Entrepôt `warehouse.db` généré + requêtes des 3 KPI + résultats + analyse (3–4 phrases).
-- **Documentation** complète selon `docs/TEMPLATE_documentation.md`.
-- **Soutenance** courte (rôles répartis dans le groupe).
+### DAG B — `novashop_warehouse`
+Ce DAG est déclenché par le Dataset publié par le DAG A.  
+Il gère :
+- la construction des dimensions,
+- le chargement incrémental et idempotent de la table de faits,
+- le calcul du mart agrégé mensuel,
+- les contrôles qualité,
+- la supervision.
+
+## Modélisation de l’entrepôt
+
+Tables finales dans `output/warehouse.db` :
+
+- `dim_customer_scd`
+- `dim_product`
+- `dim_date`
+- `fct_sales`
+- `sales_monthly`
+- `rejects`
+- `audit_runs`
+
+### Volumétrie validée
+
+- `dim_customer_scd` : 265 lignes
+- `dim_product` : 42 lignes
+- `dim_date` : 365 lignes
+- `fct_sales` : 4 078 lignes
+- `sales_monthly` : 12 lignes
+- `rejects` : 183 lignes
+- `audit_runs` : 365 lignes
+
+## KPI
+
+Les 3 KPI demandés sont calculés sur l’entrepôt `warehouse.db` à partir du fichier `sql/kpi_a_completer.sql`.
+
+### KPI 1 — CA net de retours mensuel
+Ce KPI mesure le chiffre d’affaires net de retours par mois à partir de `sales_monthly`.  
+Il inclut aussi la variation mensuelle et le taux de marge.
+
+**Constats :**
+- Le chiffre d’affaires reste globalement stable sur l’année.
+- Un pic apparaît en août 2024.
+- Le taux de marge reste cohérent, autour de 26 % à 32 %.
+
+### KPI 2 — Taux de retour par catégorie
+Ce KPI mesure la part de retours par catégorie produit à partir de `fct_sales` et `dim_product`.
+
+**Constats :**
+- La catégorie Jardin présente le taux de retour le plus élevé parmi les vraies catégories.
+- Informatique affiche le taux de retour le plus faible.
+- Les écarts restent modérés.
+
+### KPI 3 — Panier moyen par segment
+Ce KPI mesure le panier moyen par segment client, en utilisant le segment historisé au moment de la commande via le SCD Type 2.
+
+**Constats :**
+- Le segment Particulier génère le plus grand nombre de commandes.
+- Le segment Particulier a aussi le panier moyen le plus élevé.
+- L’usage du SCD2 garantit une analyse correcte dans le temps.
+
+## Exécution des KPI
+
+Le fichier `sql/kpi_a_completer.sql` contient les 3 requêtes SQL.  
+Les résultats peuvent être exécutés via Docker ou dans un outil SQLite.
+
+### Exemple d’exécution dans Docker
+```bash
+docker compose cp .\sql\kpi_a_completer.sql airflow-scheduler:/tmp/kpi.sql
+docker compose exec -T airflow-scheduler python /tmp/kpi_runner.py
+```
+
+## Orchestration
+
+- Le DAG A publie un Dataset.
+- Le DAG B est déclenché automatiquement par ce Dataset.
+- Le chargement est incrémental, idempotent et journalisé dans `audit_runs`.
+
+## Documentation
+
+La documentation complète du projet est disponible dans `docs/TEMPLATE_documentation.md`.  
+Elle décrit :
+- les sources,
+- les traitements,
+- la modélisation,
+- l’orchestration,
+- les KPI,
+- les résultats de validation.
+
+## Démarrage de secours
+
+Si nécessaire :
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+## Remarques
+
+- Le projet utilise Apache Airflow en local avec Docker Compose.
+- Les tâches de transformation et de chargement ont été validées sur les données fournies.
+- La table `rejects` permet de tracer les anomalies détectées pendant le traitement.

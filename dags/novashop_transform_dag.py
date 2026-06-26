@@ -56,4 +56,6 @@ with DAG(
         outlets=[CURATED],
     )
 
-    extract >> clean >> [scd2, dims] >> load_ref
+    extract >> clean >> scd2
+    extract >> clean >> dims
+    [scd2, dims] >> load_ref

@@ -59,6 +59,7 @@ services:
       _AIRFLOW_WWW_USER_USERNAME: airflow
       _AIRFLOW_WWW_USER_PASSWORD: airflow
       AIRFLOW_UID: ${AIRFLOW_UID:-50000}
+      _PIP_ADDITIONAL_REQUIREMENTS: ''
     user: "0:0"
 
   airflow-scheduler:
